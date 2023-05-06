@@ -21,7 +21,6 @@ public class Player {
     
 
     // Getters and setters for the properties
-    // ...
 
     public void dealCard(Card card) {
         hand.add(card);

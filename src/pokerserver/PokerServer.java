@@ -9,14 +9,14 @@ public class PokerServer extends JFrame implements Runnable {
 
 	private static final int WIDTH = 400;
 	private static final int HEIGHT = 300;
-	private static final int MAX_PLAYERS = 6;
+	static final int MAX_PLAYERS = 6;
 
-	private List<PrintWriter> clients = new ArrayList<>();
-	private JTextArea serverTextArea;
-	private PlayerSeat[] seats;
+	List<PrintWriter> clients = new ArrayList<>();
+	JTextArea serverTextArea;
+	PlayerSeat[] seats;
 	private int serverPort;
-	private Set<String> uniqueIDs = new HashSet<>();
-	private CountdownTimer countdownTimer;
+	Set<String> uniqueIDs = new HashSet<>();
+	CountdownTimer countdownTimer;
 	
 	private boolean gameInProgress = false;
 	private PokerGame currentGame;
@@ -34,6 +34,7 @@ public class PokerServer extends JFrame implements Runnable {
 		clients = new ArrayList<>();
 		uniqueIDs = new HashSet<>();
 		setGameInProgress(false);
+//		PokerGame currentGame = new PokerGame();
 	}
 
 	private void createMenu() {
@@ -69,109 +70,21 @@ public class PokerServer extends JFrame implements Runnable {
 
 	@Override
 	public void run() {
-		try {
-			ServerSocket serverSocket = new ServerSocket(serverPort);
-			setTitle("Poker Server: Port " + serverPort);
-			while (true) {
-				Socket clientSocket = serverSocket.accept();
+        try {
+            ServerSocket serverSocket = new ServerSocket(serverPort);
+            setTitle("Poker Server: Port " + serverPort);
+            while (true) {
+                Socket clientSocket = serverSocket.accept();
+                ClientHandler clientHandler = new ClientHandler(this, clientSocket);
+                Thread clientThread = new Thread(clientHandler);
+                clientThread.start();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
-				// Create a new thread to handle the client's connection
-				Thread clientThread = new Thread(() -> handleClientConnection(clientSocket));
-				clientThread.start();
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-
-	private void handleClientConnection(Socket clientSocket) {
-		try {
-			// Create input and output streams for the client's socket
-			BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-			PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
-
-			// Read the client's ID from the input stream
-			String id = in.readLine();
-			serverTextArea.append("Client " + id + " connected\n");
-			broadcast("PLAYER_JOINED " + id);
-			// Add the client's output stream to the list of clients
-			synchronized (clients) {
-				clients.add(out);
-			}
-			// Check for duplicate IDs and handle accordingly
-			synchronized (uniqueIDs) {
-				if (uniqueIDs.contains(id)) {
-					out.println("DUPLICATE_ID");
-					clientSocket.close();
-					return;
-				} else {
-					uniqueIDs.add(id);
-				}
-			}
-			// Seat Handling
-			int assignedSeat = -1;
-			List<Integer> availableSeats = new ArrayList<>();
-			synchronized (seats) {
-				for (int i = 0; i < MAX_PLAYERS; i++) {
-					if (seats[i] == null) {
-						seats[i] = new PlayerSeat(i);
-					}
-					if (!seats[i].isOccupied) {
-						availableSeats.add(i);
-					}
-				}
-				if (!availableSeats.isEmpty()) {
-					int randomIndex = new Random().nextInt(availableSeats.size());
-					assignedSeat = availableSeats.get(randomIndex);
-					seats[assignedSeat].assignSeat(id);
-				}
-			}
-			if (assignedSeat == -1) {
-				out.println("REFUSED");
-				clientSocket.close();
-				return;
-			} else {
-				// Broadcast the updated seat information to all clients
-				broadcast("SEATINFO " + getSeatInfo());
-				out.println("ASSIGNED " + (assignedSeat));
-				out.println("SEATINFO " + getSeatInfo());
-			}
-			synchronized (uniqueIDs) {
-			    int playerCount = uniqueIDs.size();
-			    if (playerCount >= 2 && countdownTimer != null && !countdownTimer.isRunning()) {
-			        countdownTimer = new CountdownTimer(this, 10, () -> uniqueIDs.size());
-			        countdownTimer.start();
-			    }
-			}
-			// TODO
-			// Handle the "DISCONNECT" message
-			while (true) {
-				String message = in.readLine();
-				if (message == null || message.equals("DISCONNECT")) {
-					synchronized (seats) {
-						seats[assignedSeat].releaseSeat();
-					}
-					serverTextArea.append("Client " + id + " disconnected\n");
-					broadcast("PLAYER_DISCONNECTED " + id);
-					broadcast("SEATINFO " + getSeatInfo());
-					break;
-				}
-			}
-
-			// Remove the client's output stream from the list of clients and the unique ID
-	        synchronized (clients) {
-	            clients.remove(out);
-	        }
-	        synchronized (uniqueIDs) {
-	            uniqueIDs.remove(id);
-	        }
-
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-
-	private String getSeatInfo() {
+	String getSeatInfo() {
 		StringBuilder seatInfo = new StringBuilder();
 		synchronized (seats) {
 			for (int i = 0; i < MAX_PLAYERS; i++) {
@@ -183,7 +96,7 @@ public class PokerServer extends JFrame implements Runnable {
 		return seatInfo.toString();
 	}
 
-	private void broadcast(String message) {
+	void broadcast(String message) {
 		for (PrintWriter client : clients) {
 			client.println(message);
 		}
@@ -206,7 +119,7 @@ public class PokerServer extends JFrame implements Runnable {
 	    synchronized (seats) {
 	        for (PlayerSeat seat : seats) {
 	            if (seat != null && seat.isOccupied) {
-	                Player player = new Player(seat.playerId, seat.seatNumber, initialChips);
+	                Player player = new Player(seat.playerId, seat.seatNumber, 200);
 	                currentGame.addPlayer(player);
 	            }
 	        }
@@ -233,3 +146,4 @@ public class PokerServer extends JFrame implements Runnable {
 		this.gameInProgress = gameInProgress;
 	}
 }
+
