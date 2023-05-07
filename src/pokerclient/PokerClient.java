@@ -12,39 +12,38 @@ public class PokerClient extends JFrame implements Runnable {
 	private static final int HEIGHT = 900;
 	private JPanel tablePanel;
 	private JTextArea logTextArea;
-	
+
 	private JLabel[] communityCards;
 	private JLabel[] playerHoldCards;
 	private JLabel potSizeLabel;
-	
-	//Player action button
+
+	// Player action button
 	private JButton foldButton;
 	private JButton callButton;
 	private JButton raiseButton;
 	private JButton allInButton;
 	private JSpinner raiseAmountSpinner;
-	
+
 	// Networking and game state management
 	private PrintWriter out;
 	private BufferedReader in;
 	private String serverAddress;
 	private int serverPort;
 	private String id;
-	
 
 	// PokerClient constructor
 	public PokerClient() {
-	    super("Poker Client");
-	    // Set up UI components for Poker game
-	    setupUI();
-	    // Connect to server and initialize game state
-	    connectToServer();
-	    setWindowTitle(id);
-	    
-	    this.setResizable(false);
-	    
-	    // When window is close then disconnect from the server
-	    shutdownHook(); 
+		super("Poker Client");
+		// Set up UI components for Poker game
+		setupUI();
+		// Connect to server and initialize game state
+		connectToServer();
+		setWindowTitle(id);
+
+		this.setResizable(false);
+
+		// When window is close then disconnect from the server
+		shutdownHook();
 	}
 
 	private void setupUI() {
@@ -93,54 +92,50 @@ public class PokerClient extends JFrame implements Runnable {
 		tablePanel.add(player5);
 		tablePanel.add(player6);
 
-		 // Set up action buttons and raise amount spinner
-	    foldButton = new JButton("Fold");
-	    callButton = new JButton("Check/Call");
-	    raiseButton = new JButton("Raise");
-	    allInButton = new JButton("All In");
-	    SpinnerNumberModel spinnerModel = new SpinnerNumberModel(1, 1, Integer.MAX_VALUE, 1);
-	    raiseAmountSpinner = new JSpinner(spinnerModel);
+		// Set up action buttons and raise amount spinner
+		foldButton = new JButton("Fold");
+		callButton = new JButton("Check/Call");
+		raiseButton = new JButton("Raise");
+		allInButton = new JButton("All In");
+		SpinnerNumberModel spinnerModel = new SpinnerNumberModel(1, 1, Integer.MAX_VALUE, 1);
+		raiseAmountSpinner = new JSpinner(spinnerModel);
 
-	    // Position the action buttons and raise amount spinner
-	    foldButton.setBounds(400, 700, 100, 50);
-	    callButton.setBounds(550, 700, 100, 50);
-	    raiseButton.setBounds(700, 700, 100, 50);
-	    raiseAmountSpinner.setBounds(800, 700, 100, 50);
-	    allInButton.setBounds(950, 700, 100, 50);
-	    
+		// Position the action buttons and raise amount spinner
+		foldButton.setBounds(400, 700, 100, 50);
+		callButton.setBounds(550, 700, 100, 50);
+		raiseButton.setBounds(700, 700, 100, 50);
+		raiseAmountSpinner.setBounds(800, 700, 100, 50);
+		allInButton.setBounds(950, 700, 100, 50);
 
-	    // Add action buttons and raise amount spinner to the tablePanel
-	    tablePanel.add(foldButton);
-	    tablePanel.add(callButton);
-	    tablePanel.add(raiseButton);
-	    tablePanel.add(allInButton);
-	    tablePanel.add(raiseAmountSpinner);
+		// Add action buttons and raise amount spinner to the tablePanel
+		tablePanel.add(foldButton);
+		tablePanel.add(callButton);
+		tablePanel.add(raiseButton);
+		tablePanel.add(allInButton);
+		tablePanel.add(raiseAmountSpinner);
 
-	    // Add listeners for the buttons (to be implemented later)
-	    foldButton.addActionListener(e -> handleFoldAction());
-	    callButton.addActionListener(e -> handleCallAction());
-	    raiseButton.addActionListener(e -> handleRaiseAction());
-	    allInButton.addActionListener(e -> handleAllInAction());
-	    
-	    // Create a log panel for the clients
-	    logTextArea = new JTextArea();
-	    logTextArea.setEditable(false);
-	    logTextArea.setLineWrap(true);
-	    logTextArea.setWrapStyleWord(true);
-	    JScrollPane logScrollPane = new JScrollPane(logTextArea);
-	    logScrollPane.setBounds(50, 700, 250, 150);
-	    
-	    //Add log panel for clients
-	    tablePanel.add(logScrollPane);
-	    
+		// Add listeners for the buttons (to be implemented later)
+		foldButton.addActionListener(e -> handleFoldAction());
+		callButton.addActionListener(e -> handleCallAction());
+		raiseButton.addActionListener(e -> handleRaiseAction());
+		allInButton.addActionListener(e -> handleAllInAction());
+
+		// Create a log panel for the clients
+		logTextArea = new JTextArea();
+		logTextArea.setEditable(false);
+		logTextArea.setLineWrap(true);
+		logTextArea.setWrapStyleWord(true);
+		JScrollPane logScrollPane = new JScrollPane(logTextArea);
+		logScrollPane.setBounds(50, 700, 250, 150);
+
+		// Add log panel for clients
+		tablePanel.add(logScrollPane);
+
 		// Set up community cards, player hole cards, pot size label, and player actions
 		// ...
-	    
 
 		this.setVisible(true);
 	}
-
-	
 
 	private JLabel createPlayerLabel(String text) {
 		JLabel label = new JLabel(text);
@@ -152,14 +147,14 @@ public class PokerClient extends JFrame implements Runnable {
 	}
 
 	public void setWindowTitle(String id) {
-	    this.setTitle("Poker Client: " + id);
+		this.setTitle("Poker Client: " + id);
 	}
-	
+
 	private void connectToServer() {
 		JTextField serverAddressField = new JTextField();
 		JTextField portField = new JTextField();
 		JTextField idField = new JTextField();
-		
+
 		JPanel inputPanel = new JPanel(new GridLayout(0, 2));
 		inputPanel.add(new JLabel("Server IP address:"));
 		inputPanel.add(serverAddressField);
@@ -192,28 +187,31 @@ public class PokerClient extends JFrame implements Runnable {
 		}
 	}
 
-	
-
 	// Game-related methods
+	private void sendPlayerAction(String action) {
+		if (out != null) {
+			out.println(action);
+			out.flush();
+		}
+	}
+
 	private void handleFoldAction() {
-	    // Implement fold action logic
+		sendPlayerAction("FOLD");
 	}
 
 	private void handleCallAction() {
-	    // Implement call action logic
+		sendPlayerAction("CALL");
 	}
 
 	private void handleRaiseAction() {
-	    // Implement raise action logic
-	    int raiseAmount = (int) raiseAmountSpinner.getValue();
+		int raiseAmount = (int) raiseAmountSpinner.getValue();
+		sendPlayerAction("RAISE " + raiseAmount);
 	}
 
 	private void handleAllInAction() {
-	    // Implement all-in action logic
+		sendPlayerAction("ALL_IN");
 	}
 
-	
-	
 	// Networking-related methods
 	private void updateAssignedSeat(int assignedSeat) {
 		SwingUtilities.invokeLater(() -> {
@@ -224,49 +222,47 @@ public class PokerClient extends JFrame implements Runnable {
 			}
 		});
 	}
-	
-	private void updateOtherSeats(String seatInfo) {
-	    SwingUtilities.invokeLater(() -> {
-	        // Update player labels for occupied seats based on seat information
-	        String[] seatData = seatInfo.split(";");
-	        for (String data : seatData) {
-	            if (!data.isEmpty()) {
-	                String[] seatInfoParts = data.split(",");
-	                int seatIndex = Integer.parseInt(seatInfoParts[0].trim());
-	                String playerId = seatInfoParts[1].trim();
 
-	                Component seatLabel = tablePanel.getComponent(seatIndex);
-	                if (seatLabel instanceof JLabel) {
-	                    JLabel label = (JLabel) seatLabel;
-	                    // Skip updating the label for the client's own seat
-	                    if (!playerId.equals(id)) {
-	                        label.setText(playerId);
-	                    } else {
-	                        label.setText("You");
-	                    }
-	                }
-	            }
-	        }
-	    });
+	private void updateOtherSeats(String seatInfo) {
+		SwingUtilities.invokeLater(() -> {
+			// Update player labels for occupied seats based on seat information
+			String[] seatData = seatInfo.split(";");
+			for (String data : seatData) {
+				if (!data.isEmpty()) {
+					String[] seatInfoParts = data.split(",");
+					int seatIndex = Integer.parseInt(seatInfoParts[0].trim());
+					String playerId = seatInfoParts[1].trim();
+
+					Component seatLabel = tablePanel.getComponent(seatIndex);
+					if (seatLabel instanceof JLabel) {
+						JLabel label = (JLabel) seatLabel;
+						// Skip updating the label for the client's own seat
+						if (!playerId.equals(id)) {
+							label.setText(playerId);
+						} else {
+							label.setText("You");
+						}
+					}
+				}
+			}
+		});
 	}
-	
+
 	private void updateLog(String message) {
-	    SwingUtilities.invokeLater(() -> {
-	        logTextArea.append(message + "\n");
-	    });
+		SwingUtilities.invokeLater(() -> {
+			logTextArea.append(message + "\n");
+		});
 	}
 
 	// A hook handle the window close event
 	private void shutdownHook() {
-	    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-	        if (out != null) {
-	            out.println("DISCONNECT");
-	            out.flush();
-	        }
-	    }));
+		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+			if (out != null) {
+				out.println("DISCONNECT");
+				out.flush();
+			}
+		}));
 	}
-
-	
 
 	private void showError(String message) {
 		JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
@@ -281,8 +277,8 @@ public class PokerClient extends JFrame implements Runnable {
 			String response = in.readLine();
 			// Check if ID is duplicate then assign a seat
 			if (response.equals("DUPLICATE_ID")) {
-	            showError("Duplicate ID. Please use a unique ID.");
-	            System.exit(1);
+				showError("Duplicate ID. Please use a unique ID.");
+				System.exit(1);
 			} else if (response.startsWith("ASSIGNED")) {
 				int assignedSeat = Integer.parseInt(response.split(" ")[1]);
 				// Call a method to update the UI
@@ -290,21 +286,30 @@ public class PokerClient extends JFrame implements Runnable {
 			} else if (response.equals("REFUSED")) {
 				showError("Connection refused. The table is full.");
 				System.exit(1);
-			} 
+			}
 			while (true) {
-			    response = in.readLine();
-			    if (response.startsWith("SEATINFO")) {
-			        String seatInfo = response.substring(8);
-			        updateOtherSeats(seatInfo);
-			    } else if (response.startsWith("PLAYER_JOINED")) {
-				    String playerName = response.split(" ")[1];
-				    updateLog(playerName + " has joined the game.");
+				response = in.readLine();
+				if (response.startsWith("SEATINFO")) {
+					String seatInfo = response.substring(8);
+					updateOtherSeats(seatInfo);
+				} else if (response.startsWith("PLAYER_JOINED")) {
+					String playerName = response.split(" ")[1];
+					updateLog(playerName + " has joined the game.");
 				} else if (response.startsWith("GAME_START")) {
-				    updateLog("The game has started.");
+					updateLog("The game has started.");
 				} else if (response.startsWith("PLAYER_DISCONNECTED")) {
 					String playerName = response.split(" ")[1];
 					updateLog(playerName + " has left the game.");
+				} else if (response.startsWith("COMMUNITY_CARDS")) {
+					// Update community cards based on the server's message
+				} else if (response.startsWith("HOLE_CARDS")) {
+					// Update player hole cards based on the server's message
+				} else if (response.startsWith("POT_SIZE")) {
+					// Update the pot size label based on the server's message
+				} else if (response.startsWith("PLAYER_ACTION")) {
+					// Update the log and/or UI based on the action taken by another player
 				}
+
 			}
 
 		} catch (IOException e) {
@@ -312,7 +317,7 @@ public class PokerClient extends JFrame implements Runnable {
 			System.exit(1);
 		}
 	}
-	
+
 	public static void main(String[] args) {
 		PokerClient pokerClient = new PokerClient();
 	}

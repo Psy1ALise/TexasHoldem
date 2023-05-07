@@ -48,7 +48,7 @@ public class CountdownTimer extends Thread {
             timeRemaining--;
         }
         if (running) {
-            server.startGame();
+            server.startNewRound();
         }
     }
 }

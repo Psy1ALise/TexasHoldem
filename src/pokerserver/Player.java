@@ -25,12 +25,23 @@ public class Player {
     public void dealCard(Card card) {
         hand.add(card);
     }
-
-    public void fold() {
-        isFolded = true;
+    
+    void bet(int betAmount) {
+        this.chips -= betAmount;
     }
 
-    public void allIn() {
+    public boolean getFold() {
+    	return isFolded;
+    }
+    
+    public void setFold() {
+        isFolded = true;
+    }
+    
+    public boolean getAllIn() {
+    	return isAllIn;
+    }
+    public void setAllIn() {
         isAllIn = true;
     }
 
@@ -40,6 +51,10 @@ public class Player {
         isAllIn = false;
     }
 
+    public int getChips() {
+    	return chips;
+    }
+    
     public void addChips(int amount) {
         chips += amount;
     }
@@ -47,4 +62,9 @@ public class Player {
     public void removeChips(int amount) {
         chips -= amount;
     }
+
+
+	public int getSeatNumber() {
+		return seat;
+	}
 }

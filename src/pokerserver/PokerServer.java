@@ -17,10 +17,9 @@ public class PokerServer extends JFrame implements Runnable {
 	private int serverPort;
 	Set<String> uniqueIDs = new HashSet<>();
 	CountdownTimer countdownTimer;
-	
-	private boolean gameInProgress = false;
-	private PokerGame currentGame;
 
+	private boolean roundInProgress = false;
+	private PokerGame currentGame;
 
 	public PokerServer() {
 		super("Poker Server");
@@ -33,8 +32,7 @@ public class PokerServer extends JFrame implements Runnable {
 		seats = new PlayerSeat[MAX_PLAYERS];
 		clients = new ArrayList<>();
 		uniqueIDs = new HashSet<>();
-		setGameInProgress(false);
-//		PokerGame currentGame = new PokerGame();
+		setRoundInProgress(false);
 	}
 
 	private void createMenu() {
@@ -70,19 +68,19 @@ public class PokerServer extends JFrame implements Runnable {
 
 	@Override
 	public void run() {
-        try {
-            ServerSocket serverSocket = new ServerSocket(serverPort);
-            setTitle("Poker Server: Port " + serverPort);
-            while (true) {
-                Socket clientSocket = serverSocket.accept();
-                ClientHandler clientHandler = new ClientHandler(this, clientSocket);
-                Thread clientThread = new Thread(clientHandler);
-                clientThread.start();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
+		try {
+			ServerSocket serverSocket = new ServerSocket(serverPort);
+			setTitle("Poker Server: Port " + serverPort);
+			while (true) {
+				Socket clientSocket = serverSocket.accept();
+				ClientHandler clientHandler = new ClientHandler(this, clientSocket);
+				Thread clientThread = new Thread(clientHandler);
+				clientThread.start();
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 
 	String getSeatInfo() {
 		StringBuilder seatInfo = new StringBuilder();
@@ -101,16 +99,16 @@ public class PokerServer extends JFrame implements Runnable {
 			client.println(message);
 		}
 	}
-	
-	public void startGame() {
-	    // Stop the countdown timer
-	    if (countdownTimer != null) {
-	        countdownTimer.stopTimer();
-	        countdownTimer = null;
-	    }
 
-	    // Start the game logic
-	    setGameInProgress(true);
+	public void startNewRound() {
+//		// Stop the countdown timer
+//		if (countdownTimer != null) {
+//			countdownTimer.stopTimer();
+//			countdownTimer = null;
+//		}
+
+		// Start the game logic
+	    setRoundInProgress(true);
 
 	    // Initialize the PokerGame instance
 	    currentGame = new PokerGame();
@@ -125,25 +123,42 @@ public class PokerServer extends JFrame implements Runnable {
 	        }
 	    }
 
-	    // Initialize the dealer position after all players are added
-	    if (currentGame.getGameId() == 0) {
-	        currentGame.setRandomDealer();
-	    }
-
 	    broadcast("GAME_START");
 	    serverTextArea.append("Game Started\n");
+
+	    // Sort players by their seat number
+	    currentGame.sortPlayersBySeat();
+	    // Initialize the seats in game
+//	    currentGame.initOccupiedSeats();
+
+	    // Initialize the dealer position after all players are added
+	    if (currentGame.getRoundId() == 0) {
+	        currentGame.setRandomDealer();
+	        serverTextArea.append("Dealer is " + currentGame.getDealerPosition() + "\n");
+	    } else {
+	        currentGame.setNextDealer();
+	        serverTextArea.append("Dealer is " + currentGame.getDealerPosition() + "\n");
+	    }
+
+	    // Game Actions
+	    currentGame.dealCards();
+	    currentGame.blindBets();
+	    currentGame.playerActions();
+
+	    // Set roundInProgress to false when the round is over
+	    // You will need to add proper round handling and game flow logic
+	    // in your PokerGame class and set roundInProgress to false when the round is over
+	}
+
+	public boolean isRoundInProgress() {
+		return roundInProgress;
+	}
+
+	public void setRoundInProgress(boolean roundInProgress) {
+		this.roundInProgress = roundInProgress;
 	}
 
 	public static void main(String[] args) {
 		PokerServer pokerServer = new PokerServer();
 	}
-
-	public boolean isGameInProgress() {
-		return gameInProgress;
-	}
-
-	public void setGameInProgress(boolean gameInProgress) {
-		this.gameInProgress = gameInProgress;
-	}
 }
-

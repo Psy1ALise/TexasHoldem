@@ -10,17 +10,17 @@ import java.util.List;
 import java.util.Random;
 
 public class ClientHandler implements Runnable {
-    private PokerServer server;
-    private Socket clientSocket;
+	private PokerServer server;
+	private Socket clientSocket;
 
-    public ClientHandler(PokerServer server, Socket clientSocket) {
-        this.server = server;
-        this.clientSocket = clientSocket;
-    }
+	public ClientHandler(PokerServer server, Socket clientSocket) {
+		this.server = server;
+		this.clientSocket = clientSocket;
+	}
 
-    @Override
-    public void run() {
-    	try {
+	@Override
+	public void run() {
+		try {
 			// Create input and output streams for the client's socket
 			BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 			PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
@@ -47,6 +47,8 @@ public class ClientHandler implements Runnable {
 			int assignedSeat = -1;
 			List<Integer> availableSeats = new ArrayList<>();
 			synchronized (server.seats) {
+				// Create a available seat with seat number 0-5 for clients, if the seat number
+				// is occupied then skip
 				for (int i = 0; i < server.MAX_PLAYERS; i++) {
 					if (server.seats[i] == null) {
 						server.seats[i] = new PlayerSeat(i);
@@ -58,7 +60,7 @@ public class ClientHandler implements Runnable {
 				if (!availableSeats.isEmpty()) {
 					int randomIndex = new Random().nextInt(availableSeats.size());
 					assignedSeat = availableSeats.get(randomIndex);
-					server.seats[assignedSeat].assignSeat(id);
+					server.seats[assignedSeat].assignSeat(id); // Assign a random available seat to the connected client
 				}
 			}
 			if (assignedSeat == -1) {
@@ -68,15 +70,20 @@ public class ClientHandler implements Runnable {
 			} else {
 				// Broadcast the updated seat information to all clients
 				server.broadcast("SEATINFO " + server.getSeatInfo());
-				out.println("ASSIGNED " + (assignedSeat));
+				out.println("ASSIGNED " + assignedSeat);
 				out.println("SEATINFO " + server.getSeatInfo());
 			}
+			server.serverTextArea.append("0000");
 			synchronized (server.uniqueIDs) {
-			    int playerCount = server.uniqueIDs.size();
-			    if (playerCount >= 2 && server.countdownTimer != null && !server.countdownTimer.isRunning()) {
-			        server.countdownTimer = new CountdownTimer(server, 10, () -> server.uniqueIDs.size());
-			        server.countdownTimer.start();
-			    }
+				int playerCount = server.uniqueIDs.size();
+//				if (playerCount >= 2 && server.countdownTimer != null && !server.countdownTimer.isRunning()) {
+//					server.countdownTimer = new CountdownTimer(server, 10, () -> server.uniqueIDs.size());
+//					server.countdownTimer.start();
+//				}
+				if (playerCount >= 2 && !server.isRoundInProgress()) {
+					server.serverTextArea.append("abcd\n");
+					server.startNewRound();
+				}
 			}
 			// TODO
 			// Handle the "DISCONNECT" message
@@ -94,15 +101,15 @@ public class ClientHandler implements Runnable {
 			}
 
 			// Remove the client's output stream from the list of clients and the unique ID
-	        synchronized (server.clients) {
-	            server.clients.remove(out);
-	        }
-	        synchronized (server.uniqueIDs) {
-	            server.uniqueIDs.remove(id);
-	        }
+			synchronized (server.clients) {
+				server.clients.remove(out);
+			}
+			synchronized (server.uniqueIDs) {
+				server.uniqueIDs.remove(id);
+			}
 
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-    }
+	}
 }
