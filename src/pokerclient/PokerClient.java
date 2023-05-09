@@ -196,20 +196,20 @@ public class PokerClient extends JFrame implements Runnable {
 	}
 
 	private void handleFoldAction() {
-		sendPlayerAction("FOLD");
+		sendPlayerAction("ACTION FOLD");
 	}
 
 	private void handleCallAction() {
-		sendPlayerAction("CALL");
+		sendPlayerAction("ACTION CALL");
 	}
 
 	private void handleRaiseAction() {
 		int raiseAmount = (int) raiseAmountSpinner.getValue();
-		sendPlayerAction("RAISE " + raiseAmount);
+		sendPlayerAction("ACTION RAISE " + raiseAmount);
 	}
 
 	private void handleAllInAction() {
-		sendPlayerAction("ALL_IN");
+		sendPlayerAction("ACTION ALL_IN");
 	}
 
 	// Networking-related methods
@@ -258,6 +258,7 @@ public class PokerClient extends JFrame implements Runnable {
 	private void shutdownHook() {
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 			if (out != null) {
+				out.println("ACTION FOLD");
 				out.println("DISCONNECT");
 				out.flush();
 			}

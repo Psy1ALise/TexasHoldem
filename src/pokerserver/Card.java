@@ -2,7 +2,7 @@ package pokerserver;
 
 public class Card {
     public enum Suit {
-        CLUBS, DIAMONDS, HEARTS, SPADES;
+        HEART, SPADE, CLUB, DIAMOND;
 
     }
 

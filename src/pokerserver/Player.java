@@ -9,6 +9,7 @@ public class Player {
     private int chips;
     private boolean isFolded;
     private boolean isAllIn;
+    private int sinkValue;
 
     public Player(String id, int seat, int initialChips) {
         this.id = id;
@@ -22,14 +23,36 @@ public class Player {
 
     // Getters and setters for the properties
 
+    public String getId() {
+    	return id;
+    }
+    
     public void dealCard(Card card) {
         hand.add(card);
     }
     
     void bet(int betAmount) {
-        this.chips -= betAmount;
+        if (betAmount >= chips) { // Player goes all-in
+            betAmount = chips;
+            setAllIn();
+        }
+        chips -= betAmount;
+        sinkValue += betAmount;
     }
 
+    void call(int currentBet) {
+        int callAmount = currentBet - sinkValue;
+        if (callAmount >= chips) { // Player goes all-in
+            callAmount = chips;
+            setAllIn();
+        }
+        bet(callAmount);
+    }
+    
+    int getSinkValue() {
+    	return sinkValue;
+    }
+    
     public boolean getFold() {
     	return isFolded;
     }

@@ -111,7 +111,7 @@ public class PokerServer extends JFrame implements Runnable {
 	    setRoundInProgress(true);
 
 	    // Initialize the PokerGame instance
-	    currentGame = new PokerGame();
+	    currentGame = new PokerGame(this);
 
 	    // Add connected players to the game
 	    synchronized (seats) {
@@ -141,13 +141,12 @@ public class PokerServer extends JFrame implements Runnable {
 	    }
 
 	    // Game Actions
-	    currentGame.dealCards();
-	    currentGame.blindBets();
-	    currentGame.playerActions();
+	    synchronized(currentGame) {
+		    currentGame.playerActions();
+	    }
+	    
 
-	    // Set roundInProgress to false when the round is over
-	    // You will need to add proper round handling and game flow logic
-	    // in your PokerGame class and set roundInProgress to false when the round is over
+	   
 	}
 
 	public boolean isRoundInProgress() {
@@ -160,5 +159,9 @@ public class PokerServer extends JFrame implements Runnable {
 
 	public static void main(String[] args) {
 		PokerServer pokerServer = new PokerServer();
+	}
+
+	public PokerGame getCurrentGame() {
+		return currentGame;
 	}
 }

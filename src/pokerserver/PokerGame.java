@@ -4,6 +4,7 @@ import java.util.*;
 
 public class PokerGame {
 
+	PokerServer server;
 	private int roundId;
 	private static int nextRoundId = 0;
 
@@ -15,9 +16,12 @@ public class PokerGame {
 	private Player currentPlayer;
 	private int currentBet;
 	private int pot;
+	private Object actionLock = new Object();
+	private String playerAction = null;
 
-	public PokerGame() {
+	public PokerGame(PokerServer server) {
 		// Initialize game state
+		this.server = server;
 		roundId = nextRoundId++;
 		deck = new Deck();
 		players = new ArrayList<>();
@@ -25,6 +29,8 @@ public class PokerGame {
 		communityCards = new ArrayList<>();
 		currentBet = 0;
 		pot = 0;
+		actionLock = new Object();
+		playerAction = null;
 	}
 
 	int getRoundId() {
@@ -115,63 +121,135 @@ public class PokerGame {
 	}
 
 	void playerActions() {
-		// Blind bets
+		// Deal Cards and set Blinds
+		dealCards();
+		blindBets();
+		currentBet = 2;
+		// Determine the starting player index for pre-flop
 		int currentDealerIndex = findPlayerIndexBySeat(dealerPosition);
-		// Start with the player on the left of the big blind
-		int currentPlayerIndex = (currentDealerIndex + 3) % players.size(); 
-		boolean blindBetCompleted = false;
-		while (!blindBetCompleted) {
-	        currentPlayer = players.get(currentPlayerIndex);
-
-	        if (!currentPlayer.getFold() && !currentPlayer.getAllIn()) {
-	            String action = getPlayerAction(currentPlayer);
-	            int amount = getBetAmount(currentPlayer, action);
-
-	            handleAction(currentPlayer, action, amount);
-
-	            if (isPlayerTurnCompleted()) {
-	            	blindBetCompleted = true;
-	                break;
-	            }
-	        }
-
-	        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-	    }
-		
-
-		// Flop bets
-
-		// Turn bets
-
-		// River bets
-	}
-	private boolean isPlayerTurnCompleted() {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	private int getBetAmount(Player currentPlayer2, String action) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
-
-	private String getPlayerAction(Player currentPlayer2) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	private void handleAction(Player player, String action, int amount) {
-		// Handle player actions (fold, call, raise, all-in)
-		if (true) {
-			
+		int startPlayerIndex = (currentDealerIndex + 3) % players.size();
+		bettingRound(startPlayerIndex);
+		currentBet = 0;
+		// Check if there is only one player active
+		if (getNumberOfActivePlayers() == 1) {
+			resolveHand();
+			return;
 		}
+
+		// Starting from flop, actions start from the player on the left of the dealer
+		startPlayerIndex = (currentDealerIndex + 1) % players.size();
+		for (int i = 0; i < 3; i++) { // Loop for flop, turn, and river
+			bettingRound(startPlayerIndex);
+			currentBet = 0;
+			if (getNumberOfActivePlayers() == 1) {
+				resolveHand();
+				return;
+			}
+		}
+
+		// Finally, resolve the hand
+		resolveHand();
+	}
+
+	private boolean bettingRound(int startPlayerIndex) {
+		int currentBet = 0;
+		while (true) {
+			boolean actionTaken = false;
+			for (int i = 0; i < players.size(); i++) {
+				int currentPlayerIndex = (startPlayerIndex + i) % players.size();
+				Player currentPlayer = players.get(currentPlayerIndex);
+
+				if (currentPlayer.getFold() || currentPlayer.getAllIn()) {
+					continue;
+				}
+
+				String playerAction = waitForPlayerAction();
+				handleAction(currentPlayer.getId(), playerAction);
+
+				if (playerAction.startsWith("RAISE")) {
+					currentBet = Integer.parseInt(playerAction.substring("RAISE".length()).trim());
+					actionTaken = true;
+				} else if (playerAction.startsWith("ALL_IN")) {
+					currentBet = currentPlayer.getChips();
+					actionTaken = true;
+				}
+			}
+
+			if (!actionTaken) {
+				break;
+			}
+		}
+
+		return getNumberOfActivePlayers() > 1;
+	}
+
+	void handleAction(String playerId, String action) {
+		// Find the player with the given ID
+		Player player = getPlayerById(playerId);
+		if (player == null) {
+			return;
+		}
+
+		synchronized (actionLock) {
+			// Handle player actions (fold, call, raise, all-in)
+			if (action.startsWith("FOLD")) {
+				player.setFold();
+				player.resetHand();
+			} else if (action.startsWith("CALL")) {
+				player.call(currentBet);
+			} else if (action.startsWith("RAISE")) {
+				int raiseAmount = Integer.parseInt(action.substring("RAISE".length()).trim());
+				player.bet(raiseAmount);
+			} else if (action.startsWith("ALL_IN")) {
+				player.bet(player.getChips());
+			}
+
+			// Notify the game loop that the player's action has been processed
+			playerAction = action;
+			actionLock.notifyAll();
+		}
+	}
+
+	String waitForPlayerAction() {
+		synchronized (actionLock) {
+			while (playerAction == null) {
+				try {
+					actionLock.wait();
+				} catch (InterruptedException e) {
+					// Handle interruption
+				}
+			}
+			String action = playerAction;
+			playerAction = null; // Reset for the next player's turn
+			return action;
+		}
+	}
+
+	private boolean isPlayerActionCompleted() {
+		long distinctBets = players.stream().filter(p -> !p.getFold() && !p.getAllIn()).mapToInt(Player::getSinkValue)
+				.distinct().count();
+		return distinctBets == 1;
+	}
+
+	private void updateCurrentBet(int amount) {
+		currentBet = Math.max(currentBet, amount);
+	}
+
+	private Player getPlayerById(String playerId) {
+		return players.stream().filter(p -> p.getId().equals(playerId)).findFirst().orElse(null);
+	}
+
+	private int getNumberOfActivePlayers() {
+		return (int) players.stream().filter(p -> !p.getFold()).count();
 	}
 
 	private void startNewHand() {
 		// Start a new hand (deal cards, set blinds, etc.)
 	}
 
-	
+	Player getCurrentPlayer() {
+		return currentPlayer;
+	}
 
 	void sortPlayersBySeat() {
 		Collections.sort(players,
@@ -182,12 +260,28 @@ public class PokerGame {
 		return (currentIndex + 1) % players.size();
 	}
 
-	private void advanceRound() {
-		// Move to the next round (pre-flop, flop, turn, river, showdown)
-	}
-
 	private void resolveHand() {
 		// Evaluate hands and determine the winner(s)
-	}
+		// Get the list of players who haven't folded
+		List<Player> activePlayers = new ArrayList<>();
+		for (Player player : players) {
+			if (!player.getFold()) {
+				activePlayers.add(player);
+			}
+		}
 
+		// Determine the winner
+		Player winner = HandEvaluator.evaluateHands(activePlayers, communityCards);
+		server.broadcast("WINNER " + winner.getId());
+
+		// Transfer the pot to the winner
+		winner.addChips(pot);
+		pot = 0;
+
+		// Reset for the next hand
+		for (Player player : players) {
+			player.resetHand();
+		}
+		communityCards.clear();
+	}
 }

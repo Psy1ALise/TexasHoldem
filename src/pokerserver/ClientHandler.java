@@ -12,7 +12,8 @@ import java.util.Random;
 public class ClientHandler implements Runnable {
 	private PokerServer server;
 	private Socket clientSocket;
-
+	private String id;
+	
 	public ClientHandler(PokerServer server, Socket clientSocket) {
 		this.server = server;
 		this.clientSocket = clientSocket;
@@ -73,7 +74,6 @@ public class ClientHandler implements Runnable {
 				out.println("ASSIGNED " + assignedSeat);
 				out.println("SEATINFO " + server.getSeatInfo());
 			}
-			server.serverTextArea.append("0000");
 			synchronized (server.uniqueIDs) {
 				int playerCount = server.uniqueIDs.size();
 //				if (playerCount >= 2 && server.countdownTimer != null && !server.countdownTimer.isRunning()) {
@@ -97,7 +97,9 @@ public class ClientHandler implements Runnable {
 					server.broadcast("PLAYER_DISCONNECTED " + id);
 					server.broadcast("SEATINFO " + server.getSeatInfo());
 					break;
-				}
+				} else if (message.startsWith("ACTION")) {
+                    handlePlayerAction(message);
+                }
 			}
 
 			// Remove the client's output stream from the list of clients and the unique ID
@@ -112,4 +114,34 @@ public class ClientHandler implements Runnable {
 			e.printStackTrace();
 		}
 	}
+
+	private void handlePlayerAction(String message) {
+	    // Extract the player action from the message, e.g., "ACTION FOLD"
+	    String action = message.substring("ACTION".length()).trim();
+
+	    // Get the current game
+	    PokerGame game = server.getCurrentGame();
+
+	    // Check if it is the current player's turn
+	    Player currentPlayer = game.getCurrentPlayer();
+	    
+	    if (currentPlayer.getId().equals(id)) {
+	        synchronized (game) {
+	            // Update the game state with the player's action
+	            game.handleAction(id, action);
+
+	            // Notify the server that the action has been processed
+	            game.notifyAll();
+	        }
+	    } else if ("FOLD".equals(action)) {
+	        // If it's not the current player's turn, but they're folding (probably due to disconnect),
+	        // then handle the action anyway
+	        synchronized (game) {
+	            game.handleAction(id, action);
+	            game.notifyAll();
+	        }
+	    } 
+	    // Ignore all other actions from players whose turn it is not
+	}
+
 }
