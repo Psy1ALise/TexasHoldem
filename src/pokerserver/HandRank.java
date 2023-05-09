@@ -1,16 +1,16 @@
 package pokerserver;
 
 public enum HandRank {
-    HIGH_CARD("High Card"),
+    HIGHCARD("High Card"),
     PAIR("Pair"),
-    TWO_PAIR("Two Pair"),
-    THREE_OF_A_KIND("Three of a Kind"),
+    TWOPAIR("Two Pair"),
+    THREEOFAKIND("Three of a Kind"),
     STRAIGHT("Straight"),
     FLUSH("Flush"),
-    FULL_HOUSE("Full House"),
-    FOUR_OF_A_KIND("Four of a Kind"),
-    STRAIGHT_FLUSH("Straight Flush"),
-    ROYAL_FLUSH("Royal Flush");
+    FULLHOUSE("Full House"),
+    FOUROFAKIND("Four of a Kind"),
+    STRAIGHTFLUSH("Straight Flush"),
+    ROYALFLUSH("Royal Flush");
 
     private final String name;
 
