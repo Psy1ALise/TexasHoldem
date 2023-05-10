@@ -90,4 +90,9 @@ public class Player {
 	public int getSeatNumber() {
 		return seat;
 	}
+
+
+	List<Card> getHand() {
+		return hand;
+	}
 }

@@ -1,6 +1,17 @@
 package pokerserver;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.Iterator;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class PokerGame {
 
@@ -261,7 +272,6 @@ public class PokerGame {
 	}
 
 	private void resolveHand() {
-		// Evaluate hands and determine the winner(s)
 		// Get the list of players who haven't folded
 		List<Player> activePlayers = new ArrayList<>();
 		for (Player player : players) {
@@ -269,13 +279,77 @@ public class PokerGame {
 				activePlayers.add(player);
 			}
 		}
+		List<Player> bestPlayers = new ArrayList<>();
+		if (activePlayers.size() > 1) {
+			PokerHandResolver resolver = new PokerHandResolver();
+			HandRank bestHandRank = null;
+			List<List<Card>> winningHands = new ArrayList<>();
 
-		// Determine the winner
-		Player winner = HandEvaluator.evaluateHands(activePlayers, communityCards);
-		server.broadcast("WINNER " + winner.getId());
+			// Evaluate hands and determine the winner(s)
+			for (Player player : activePlayers) {
+				List<Card> playerCards = new ArrayList<>(player.getHand());
+				playerCards.addAll(communityCards);
+				HandRank playerRank = resolver.getBestRank(playerCards);
 
-		// Transfer the pot to the winner
-		winner.addChips(pot);
+				if (bestHandRank == null || playerRank.compareTo(bestHandRank) > 0) {
+					bestPlayers.clear();
+					bestPlayers.add(player);
+					winningHands.clear();
+					winningHands.add(playerCards);
+					bestHandRank = playerRank;
+				} else if (playerRank.compareTo(bestHandRank) == 0) {
+					bestPlayers.add(player);
+					winningHands.add(playerCards);
+				}
+			}
+
+			if (bestPlayers.size() > 1) {
+				// Tierbreakers
+				switch (bestHandRank) {
+				case HIGH_CARD:
+					handleHandsWithMultiples(1, bestPlayers, winningHands);
+					break;
+				case PAIR:
+					handleHandsWithMultiples(2, bestPlayers, winningHands);
+					break;
+				case TWO_PAIR:
+					handleTwoPairAndFullHouse(bestHandRank, bestPlayers, winningHands);
+					break;
+				case THREE_OF_A_KIND:
+					handleHandsWithMultiples(3, bestPlayers, winningHands);
+					break;
+				case STRAIGHT:
+					handleStraight(bestPlayers, winningHands);
+					break;
+				case FLUSH:
+					handleFlush(bestPlayers, winningHands);
+					break;
+				case FULL_HOUSE:
+					handleTwoPairAndFullHouse(bestHandRank, bestPlayers, winningHands);
+					break;
+				case FOUR_OF_A_KIND:
+					handleHandsWithMultiples(4, bestPlayers, winningHands);
+					break;
+				case STRAIGHT_FLUSH:
+					handleStraightFlush(bestPlayers, winningHands);
+					break;
+				case ROYAL_FLUSH:
+					break;
+				default:
+
+				}
+			}
+
+		} else {
+			bestPlayers = activePlayers;
+		}
+
+		// TODO: Side Pot need to be done
+		// Announce the winner and transfer the pot
+		for (Player player : bestPlayers) {
+			server.broadcast("WINNER " + player.getId());
+			player.addChips(pot / bestPlayers.size());
+		}
 		pot = 0;
 
 		// Reset for the next hand
@@ -284,4 +358,245 @@ public class PokerGame {
 		}
 		communityCards.clear();
 	}
+
+	private void handleHandsWithMultiples(int numOfMultiples, List<Player> bestPlayers, List<List<Card>> winningHands) {
+		Rank hiCardRank = null;
+		List<Player> stillTiedPlayers = new ArrayList<>();
+		List<List<Card>> stillTiedHands = new ArrayList<>();
+
+		for (List<Card> hand : winningHands) {
+			Rank cardRank = (numOfMultiples == 1) ? highCard(hand) : findHighestRankWithCount(hand, numOfMultiples);
+
+			if (hiCardRank == null || cardRank.compareTo(hiCardRank) > 0) {
+				hiCardRank = cardRank;
+				stillTiedPlayers.clear();
+				stillTiedHands.clear();
+				addPlayerAndHandToLists(bestPlayers, winningHands, hand, stillTiedPlayers, stillTiedHands);
+			} else if (cardRank.equals(hiCardRank)) {
+				addPlayerAndHandToLists(bestPlayers, winningHands, hand, stillTiedPlayers, stillTiedHands);
+			}
+		}
+
+		if (stillTiedPlayers.size() > 1) {
+			// Remove the cards in the arrayList of with the hiCardRank then find the hiCard
+			// of the kicker
+			for (List<Card> hand : stillTiedHands) {
+				final Rank finalCardRank = hiCardRank;
+				hand.removeIf(card -> card.getRank().equals(finalCardRank));
+			}
+
+			// Now find the high card from the remaining cards in each hand
+			findHighKickers(bestPlayers, stillTiedHands, stillTiedPlayers);
+		} else {
+			bestPlayers = stillTiedPlayers;
+		}
+	}
+
+	private void handleStraight(List<Player> bestPlayers, List<List<Card>> winningHands) {
+		List<Player> stillTiedPlayers = new ArrayList<>();
+		Rank highestStraightRank = null;
+
+		for (List<Card> hand : winningHands) {
+			List<Rank> ranks = hand.stream().map(Card::getRank).distinct().sorted(Comparator.reverseOrder())
+					.collect(Collectors.toList());
+			Rank topRankInStraight = findStraight(ranks);
+
+			if (topRankInStraight != null) {
+				if (highestStraightRank == null || topRankInStraight.compareTo(highestStraightRank) > 0) {
+					highestStraightRank = topRankInStraight;
+					stillTiedPlayers.clear();
+					stillTiedPlayers.add(bestPlayers.get(winningHands.indexOf(hand)));
+				} else if (topRankInStraight.equals(highestStraightRank)) {
+					stillTiedPlayers.add(bestPlayers.get(winningHands.indexOf(hand)));
+				}
+			}
+		}
+
+		bestPlayers.clear();
+		bestPlayers.addAll(stillTiedPlayers);
+	}
+
+	private Rank findStraight(List<Rank> ranks) {
+		for (int i = 0; i <= ranks.size() - 5;) {
+			if (ranks.get(i).ordinal() - 1 == ranks.get(i + 1).ordinal()) {
+				if (ranks.get(i + 1).ordinal() - 1 == ranks.get(i + 2).ordinal()
+						&& ranks.get(i + 2).ordinal() - 1 == ranks.get(i + 3).ordinal()
+						&& ranks.get(i + 3).ordinal() - 1 == ranks.get(i + 4).ordinal()) {
+					return ranks.get(i);
+				} else if (i < ranks.size() - 5) {
+					// restart from next index
+					continue;
+				} else {
+					break;
+				}
+			}
+			i++;
+		}
+		if (ranks.containsAll(Arrays.asList(Rank.ACE, Rank.TWO, Rank.THREE, Rank.FOUR, Rank.FIVE))) {
+			return Rank.FIVE;
+		}
+		return null;
+	}
+
+	private void handleFlush(List<Player> bestPlayers, List<List<Card>> winningHands) {
+	    Rank hiCardRank = null;
+	    Player bestPlayer = null;
+
+	    for (List<Card> hand : winningHands) {
+	        Map<Suit, List<Card>> suitToListMap = hand.stream().collect(Collectors.groupingBy(Card::getSuit));
+
+	        Suit flushSuit = suitToListMap.entrySet().stream()
+	                .filter(entry -> entry.getValue().size() >= 5)
+	                .map(Map.Entry::getKey)
+	                .findFirst()
+	                .orElse(null);
+
+	        if (flushSuit != null) {
+	            List<Card> flushCards = suitToListMap.get(flushSuit);
+	            flushCards.sort(Comparator.comparing(Card::getRank).reversed());
+	            Rank cardRank = flushCards.get(0).getRank();
+
+	            if (hiCardRank == null || cardRank.compareTo(hiCardRank) > 0) {
+	                hiCardRank = cardRank;
+	                bestPlayer = bestPlayers.get(winningHands.indexOf(hand));
+	            }
+	        }
+	    }
+
+	    bestPlayers.clear();
+	    if (bestPlayer != null) {
+	        bestPlayers.add(bestPlayer);
+	    }
+	}
+
+	private void handleStraightFlush(List<Player> bestPlayers, List<List<Card>> winningHands) {
+	    List<Player> stillTiedPlayers = new ArrayList<>();
+	    List<List<Card>> stillTiedHands = new ArrayList<>();
+	    Rank hiStraightRank = null;
+
+	    for (List<Card> hand : winningHands) {
+	        Map<Suit, List<Card>> suitToListMap = hand.stream().collect(Collectors.groupingBy(Card::getSuit));
+	        Suit flushSuit = suitToListMap.entrySet().stream()
+	                .filter(entry -> entry.getValue().size() >= 5)
+	                .map(Map.Entry::getKey)
+	                .findFirst()
+	                .orElse(null);
+
+	        if (flushSuit != null) {
+	            List<Card> flushCards = suitToListMap.get(flushSuit);
+	            List<Rank> sortedRanks = flushCards.stream()
+	                    .map(Card::getRank)
+	                    .sorted(Comparator.reverseOrder())
+	                    .collect(Collectors.toList());
+	            Rank straightRank = findStraight(sortedRanks);
+
+	            if (straightRank != null) {
+	                if (hiStraightRank == null || straightRank.compareTo(hiStraightRank) > 0) {
+	                    hiStraightRank = straightRank;
+	                    stillTiedPlayers.clear();
+	                    stillTiedHands.clear();
+	                    addPlayerAndHandToLists(bestPlayers, winningHands, flushCards, stillTiedPlayers, stillTiedHands);
+	                } else if (straightRank.equals(hiStraightRank)) {
+	                    addPlayerAndHandToLists(bestPlayers, winningHands, flushCards, stillTiedPlayers, stillTiedHands);
+	                }
+	            }
+	        }
+	    }
+	}
+
+
+	private void handleTwoPairAndFullHouse(HandRank handRank, List<Player> bestPlayers, List<List<Card>> winningHands) {
+		List<Player> stillTiedPlayers = new ArrayList<>();
+		List<List<Card>> stillTiedHands = new ArrayList<>();
+
+		Rank hiRank1 = null;
+		Rank hiRank2 = null;
+
+		for (List<Card> hand : winningHands) {
+			Rank rank1 = findHighestRankWithCount(hand, handRank == HandRank.TWO_PAIR ? 2 : 3);
+			hand.removeIf(card -> card.getRank().equals(rank1));
+			Rank rank2 = findHighestRankWithCount(hand, 2);
+
+			if (hiRank1 == null || rank1.compareTo(hiRank1) > 0
+					|| (rank1.equals(hiRank1) && rank2.compareTo(hiRank2) > 0)) {
+				hiRank1 = rank1;
+				hiRank2 = rank2;
+				stillTiedPlayers.clear();
+				stillTiedHands.clear();
+				addPlayerAndHandToLists(bestPlayers, winningHands, hand, stillTiedPlayers, stillTiedHands);
+			} else if (rank1.equals(hiRank1) && rank2.equals(hiRank2)) {
+				addPlayerAndHandToLists(bestPlayers, winningHands, hand, stillTiedPlayers, stillTiedHands);
+			}
+		}
+
+		if (stillTiedPlayers.size() > 1 && handRank == HandRank.TWO_PAIR) {
+			for (List<Card> hand : stillTiedHands) {
+				final Rank finalRank1 = hiRank1;
+				final Rank finalRank2 = hiRank2;
+				hand.removeIf(card -> card.getRank().equals(finalRank1) || card.getRank().equals(finalRank2));
+			}
+			findHighKickers(bestPlayers, stillTiedHands, stillTiedPlayers);
+		} else {
+			bestPlayers.clear();
+			bestPlayers.addAll(stillTiedPlayers);
+		}
+	}
+
+	private Rank findHighestRankWithCount(List<Card> hand, int count) {
+		return hand.stream().collect(Collectors.groupingBy(Card::getRank, Collectors.counting())).entrySet().stream()
+				.filter(entry -> entry.getValue() == count).max(Map.Entry.comparingByKey()).get().getKey();
+	}
+
+	private void addPlayerAndHandToLists(List<Player> bestPlayers, List<List<Card>> winningHands, List<Card> hand,
+			List<Player> stillTiedPlayers, List<List<Card>> stillTiedHands) {
+		stillTiedPlayers.add(bestPlayers.get(winningHands.indexOf(hand)));
+		stillTiedHands.add(new ArrayList<>(hand));
+	}
+
+	private void findHighKickers(List<Player> bestPlayers, List<List<Card>> stillTiedHands,
+			List<Player> stillTiedPlayers) {
+		// Make a copy of hands to avoid modifying the original
+		List<List<Card>> copiedHands = stillTiedHands.stream().map(ArrayList::new).collect(Collectors.toList());
+
+		// Identify the ranks common to all hands, sorted in descending order
+		Set<Rank> commonRanks = EnumSet.allOf(Rank.class);
+		for (List<Card> hand : copiedHands) {
+			commonRanks.retainAll(hand.stream().map(Card::getRank).collect(Collectors.toSet()));
+		}
+		List<Rank> sortedCommonRanks = new ArrayList<>(commonRanks);
+		sortedCommonRanks.sort(Comparator.reverseOrder());
+
+		// Sequentially remove the highest common ranks from each hand
+		for (Rank commonRank : sortedCommonRanks) {
+			for (List<Card> hand : copiedHands) {
+				// Loop through the hand and remove the first card with the common rank
+				Iterator<Card> iterator = hand.iterator();
+				while (iterator.hasNext()) {
+					Card card = iterator.next();
+					if (card.getRank().equals(commonRank)) {
+						iterator.remove();
+						break;
+					}
+				}
+			}
+		}
+
+		// Now find the high card from the remaining cards in each hand
+		Rank hiKickerRank = null;
+		for (List<Card> hand : copiedHands) {
+			Rank kickerRank = highCard(hand);
+			if (hiKickerRank == null || kickerRank.compareTo(hiKickerRank) > 0) {
+				hiKickerRank = kickerRank;
+				bestPlayers.clear();
+				bestPlayers.add(stillTiedPlayers.get(copiedHands.indexOf(hand)));
+			} else if (kickerRank.compareTo(hiKickerRank) == 0) {
+				bestPlayers.add(stillTiedPlayers.get(copiedHands.indexOf(hand)));
+			}
+		}
+	}
+
+	public Rank highCard(List<Card> cards) {
+		return cards.stream().max(Comparator.comparing(Card::getRank)).orElse(null).getRank();
+	}
+
 }

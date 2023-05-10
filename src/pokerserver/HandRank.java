@@ -1,24 +1,26 @@
 package pokerserver;
 
 public enum HandRank {
-    HIGHCARD("High Card"),
-    PAIR("Pair"),
-    TWOPAIR("Two Pair"),
-    THREEOFAKIND("Three of a Kind"),
-    STRAIGHT("Straight"),
-    FLUSH("Flush"),
-    FULLHOUSE("Full House"),
-    FOUROFAKIND("Four of a Kind"),
-    STRAIGHTFLUSH("Straight Flush"),
-    ROYALFLUSH("Royal Flush");
+    HIGH_CARD(1),
+    PAIR(2),
+    TWO_PAIR(3),
+    THREE_OF_A_KIND(4),
+    STRAIGHT(5),
+    FLUSH(6),
+    FULL_HOUSE(7),
+    FOUR_OF_A_KIND(8),
+    STRAIGHT_FLUSH(9),
+    ROYAL_FLUSH(10);
 
-    private final String name;
+    private final int handrank;
 
-    HandRank(String name) {
-        this.name = name;
+    HandRank(int rank) {
+        this.handrank = rank;
     }
 
-    public String getName() {
-        return name;
+    public int getHandRank() {
+        return this.handrank;
     }
+    
 }
+

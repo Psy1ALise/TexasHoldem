@@ -1,16 +1,6 @@
 package pokerserver;
 
 public class Card {
-    public enum Suit {
-        HEART, SPADE, CLUB, DIAMOND;
-
-    }
-
-    public enum Rank {
-        TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN,
-        JACK, QUEEN, KING, ACE
-    }
-
     private final Suit suit;
     private final Rank rank;
 
@@ -29,6 +19,15 @@ public class Card {
 
     @Override
     public String toString() {
-        return suit +" "+ rank;
+        return suit + " " + rank;
+    }
+    
+    public int getIntSuit() {
+    	return suit.getSuit();
+    }
+    
+    public int getIntRank() {
+    	return rank.getRank();
     }
 }
+
